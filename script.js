@@ -7,22 +7,24 @@ const downloadBtn = document.getElementById("downloadAll");
 
 let cleanedImages = [];
 
-// -------------------- UI helpers --------------------
+// ---------- UI ----------
 function setStatus(msg) {
   status.textContent = msg;
 }
-
 function setError(msg) {
   errorBox.textContent = msg;
 }
-
 function clearMessages() {
   status.textContent = "";
   errorBox.textContent = "";
 }
 
-// -------------------- drag & drop --------------------
-dropZone.addEventListener("click", () => input.click());
+// ---------- Drag & Tap ----------
+dropZone.addEventListener("click", () => {
+  dropZone.style.transform = "scale(0.98)";
+  setTimeout(() => dropZone.style.transform = "scale(1)", 100);
+  input.click();
+});
 
 dropZone.addEventListener("dragover", (e) => {
   e.preventDefault();
@@ -36,16 +38,14 @@ dropZone.addEventListener("dragleave", () => {
 dropZone.addEventListener("drop", (e) => {
   e.preventDefault();
   dropZone.style.borderColor = "#444";
-
-  const file = e.dataTransfer.files[0];
-  handleFile(file);
+  handleFile(e.dataTransfer.files[0]);
 });
 
 input.addEventListener("change", (e) => {
   handleFile(e.target.files[0]);
 });
 
-// -------------------- main logic --------------------
+// ---------- Main ----------
 async function handleFile(file) {
   clearMessages();
   container.innerHTML = "";
@@ -55,36 +55,35 @@ async function handleFile(file) {
   if (!file) return;
 
   if (!file.name.endsWith(".epub")) {
-    setError("❌ Please upload a valid EPUB file");
+    setError("❌ Please upload EPUB");
+    return;
+  }
+
+  if (!window.URL) {
+    setError("❌ Browser not supported");
     return;
   }
 
   try {
     setStatus("📦 Reading EPUB...");
-
     const zip = await JSZip.loadAsync(file);
 
-    // find OPF
-    let opfFile = Object.keys(zip.files).find(f => f.endsWith(".opf"));
+    const opfFile = Object.keys(zip.files).find(f => f.endsWith(".opf"));
+    if (!opfFile) throw new Error("OPF not found");
 
-    if (!opfFile) throw new Error("OPF file not found");
-
-    setStatus("📖 Parsing OPF...");
-
+    setStatus("📖 Parsing...");
     const opfText = await zip.files[opfFile].async("string");
     const xml = new DOMParser().parseFromString(opfText, "text/xml");
 
-    const items = [...xml.querySelectorAll("manifest > item")];
-
-    let imageItems = items.filter(item =>
-      item.getAttribute("media-type")?.startsWith("image")
+    let items = [...xml.querySelectorAll("manifest > item")];
+    let imageItems = items.filter(i =>
+      i.getAttribute("media-type")?.startsWith("image")
     );
 
     if (imageItems.length === 0) {
-      throw new Error("No images found in EPUB");
+      throw new Error("No images found");
     }
 
-    // sort images
     imageItems.sort((a, b) =>
       a.getAttribute("href").localeCompare(
         b.getAttribute("href"),
@@ -95,30 +94,22 @@ async function handleFile(file) {
 
     const basePath = opfFile.substring(0, opfFile.lastIndexOf("/") + 1);
 
-    setStatus(`🖼 Processing ${imageItems.length} images...`);
-
     let count = 0;
+    setStatus(`🖼 Processing ${imageItems.length} images...`);
 
     for (let item of imageItems) {
       const href = item.getAttribute("href");
-      const fullPath = basePath + href;
-
-      const fileObj = zip.file(fullPath);
+      const fileObj = zip.file(basePath + href);
       if (!fileObj) continue;
 
       const blob = await fileObj.async("blob");
-
       const cleanBlob = await stripMetadata(blob);
 
       const filename = href.split("/").pop();
 
-      cleanedImages.push({
-        name: filename,
-        blob: cleanBlob
-      });
+      cleanedImages.push({ name: filename, blob: cleanBlob });
 
       const url = URL.createObjectURL(cleanBlob);
-
       const img = document.createElement("img");
       img.src = url;
 
@@ -130,10 +121,15 @@ async function handleFile(file) {
       container.appendChild(link);
 
       count++;
-      setStatus(`🖼 Processing ${count}/${imageItems.length}`);
+      setStatus(`🖼 ${count}/${imageItems.length}`);
+
+      // prevent freeze on mobile
+      if (count % 5 === 0) {
+        await new Promise(r => setTimeout(r, 0));
+      }
     }
 
-    setStatus("✅ Done!");
+    setStatus("✅ Done");
     downloadBtn.disabled = false;
 
   } catch (err) {
@@ -143,7 +139,7 @@ async function handleFile(file) {
   }
 }
 
-// -------------------- metadata cleaner --------------------
+// ---------- Strip metadata ----------
 async function stripMetadata(blob) {
   return new Promise((resolve) => {
     const img = new Image();
@@ -153,8 +149,7 @@ async function stripMetadata(blob) {
       canvas.width = img.width;
       canvas.height = img.height;
 
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0);
+      canvas.getContext("2d").drawImage(img, 0, 0);
 
       const type = blob.type || "image/jpeg";
 
@@ -165,17 +160,15 @@ async function stripMetadata(blob) {
       );
     };
 
-    img.onerror = () => resolve(blob); // fallback
-
+    img.onerror = () => resolve(blob);
     img.src = URL.createObjectURL(blob);
   });
 }
 
-// -------------------- download zip --------------------
+// ---------- Download ZIP ----------
 downloadBtn.addEventListener("click", async () => {
   try {
     setStatus("📦 Creating ZIP...");
-
     const zip = new JSZip();
 
     for (let img of cleanedImages) {
@@ -191,7 +184,7 @@ downloadBtn.addEventListener("click", async () => {
 
     setStatus("✅ Download ready");
 
-  } catch (err) {
-    setError("❌ Failed to create ZIP");
+  } catch {
+    setError("❌ ZIP failed");
   }
 });
