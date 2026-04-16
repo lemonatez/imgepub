@@ -1,0 +1,74 @@
+body {
+  margin: 0;
+  font-family: system-ui;
+  background: #0f1115;
+  color: #e6e6e6;
+}
+
+.app {
+  max-width: 1000px;
+  margin: auto;
+  padding: 20px;
+}
+
+h1 {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.drop-zone {
+  border: 2px dashed #444;
+  padding: 40px;
+  text-align: center;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.drop-zone:hover {
+  border-color: #888;
+  background: #1a1d24;
+}
+
+.controls {
+  text-align: center;
+  margin: 15px 0;
+}
+
+button {
+  padding: 10px 20px;
+  border: none;
+  background: #4c8bf5;
+  color: white;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+button:disabled {
+  background: #555;
+  cursor: not-allowed;
+}
+
+.status {
+  text-align: center;
+  margin: 10px 0;
+  color: #aaa;
+}
+
+.error {
+  text-align: center;
+  margin: 10px 0;
+  color: #ff6b6b;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.grid img {
+  width: 100%;
+  border-radius: 6px;
+  background: #222;
+}
